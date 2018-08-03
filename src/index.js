@@ -1,6 +1,7 @@
 'use strict';
 const React = require('react');
 const PropTypes = require('prop-types');
+const hoist = require('hoist-non-react-statics');
 
 const ALL_INITIALIZERS = [];
 const READY_INITIALIZERS = [];
@@ -108,13 +109,6 @@ function createLoadableComponent(loadFn, options) {
 
   let res = null;
 
-  function init() {
-    if (!res) {
-      res = loadFn(opts.loader);
-    }
-    return res.promise;
-  }
-
   ALL_INITIALIZERS.push(init);
 
   if (typeof opts.webpack === 'function') {
@@ -125,7 +119,7 @@ function createLoadableComponent(loadFn, options) {
     });
   }
 
-  return class LoadableComponent extends React.Component {
+  class LoadableComponent extends React.Component {
     constructor(props) {
       super(props);
       init();
@@ -235,6 +229,21 @@ function createLoadableComponent(loadFn, options) {
       }
     }
   };
+  
+  function init() {
+    if (!res) {
+      res = loadFn(opts.loader);
+      return new Promise((resolve, reject) => {
+        res.promise.then((a) => {
+           hoist(LoadableComponent, a.default);
+          resolve(a);
+        }).catch(reject);
+      });
+    }
+    return res.promise;
+  }
+
+  return LoadableComponent;
 }
 
 function Loadable(opts) {
